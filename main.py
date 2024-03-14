@@ -12,7 +12,7 @@ def concat_state_latent(s, z_, n):
     # print(s,z_,n)
     if(type(s) == tuple):
         return np.concatenate([s[0], z_one_hot])
-    return np.concatenate([s[0], z_one_hot])
+    return np.concatenate([s, z_one_hot])
 
 
 if __name__ == "__main__":
