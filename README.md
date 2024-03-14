@@ -2,6 +2,7 @@
 
 # DIAYN
 **This repository is fork of [this repo](https://github.com/alirezakazemipour/DIAYN-PyTorch)**
+
 While intelligent  creatures can explore their environments and learn useful skills without supervision, many RL algorithms are heavily on the basis that acquiring skills is only achieved via defining them as explicit reward functions to learn.
     
 Thus, in order to translate the natural behavior of creatures in learning **diverse** skills to a suitable mathematical formulation, DIAYN (Diversity is All You Need) was proposed for learning useful skills **without any domain-specific reward function**.
