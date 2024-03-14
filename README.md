@@ -1,7 +1,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)  
 
-# DIAYN-PyTorch
-
+# DIAYN
+**This repository is fork of [this repo](https://github.com/alirezakazemipour/DIAYN-PyTorch)**
 While intelligent  creatures can explore their environments and learn useful skills without supervision, many RL algorithms are heavily on the basis that acquiring skills is only achieved via defining them as explicit reward functions to learn.
     
 Thus, in order to translate the natural behavior of creatures in learning **diverse** skills to a suitable mathematical formulation, DIAYN (Diversity is All You Need) was proposed for learning useful skills **without any domain-specific reward function**.
@@ -64,13 +64,13 @@ Reward distribution|Reward distribution|Reward distribution
 ![](Results/MountainCar/skill3.png)| ![](Results/MountainCar/skill7.png)| ![](Results/MountainCar/skill8.png)
 
 ## Dependencies
-- gym == 0.17.3
-- mujoco-py == 2.0.2.13
-- numpy == 1.19.2
-- opencv_contrib_python == 4.4.0.44
-- psutil == 5.5.1
-- torch == 1.6.0
-- tqdm == 4.50.0
+- gymnasium 
+- mujoco-py 
+- numpy
+- opencv_contrib_python 
+- psutil
+- torch
+- tqdm
 
 ## Installation
 ```bash
