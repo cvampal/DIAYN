@@ -28,7 +28,7 @@ class Logger:
     def _create_wights_folder(dir):
         if not os.path.exists("Checkpoints"):
             os.mkdir("Checkpoints")
-        os.mkdir("Checkpoints/" + dir)
+        os.makedirs("Checkpoints/" + dir)
 
     def _log_params(self):
         with SummaryWriter("Logs/" + self.log_dir) as writer:
@@ -111,7 +111,7 @@ class Logger:
     def load_weights(self):
         model_dir = glob.glob("Checkpoints/" + self.config["env_name"][:-3] + "/")
         model_dir.sort()
-        checkpoint = torch.load(model_dir[-1] + "/params.pth", map_location=torch.device('cpu'))
+        checkpoint = torch.load(model_dir[-1] + "params.pth", map_location=torch.device('cpu'))
         self.log_dir = model_dir[-1].split(os.sep)[-1]
         self.agent.policy_network.load_state_dict(checkpoint["policy_network_state_dict"])
         self.agent.q_value_network1.load_state_dict(checkpoint["q_value_network1_state_dict"])

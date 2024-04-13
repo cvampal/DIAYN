@@ -3,7 +3,6 @@ from Brain import SACAgent
 from Common import  get_params,Play, Logger
 import numpy as np
 from tqdm import tqdm
-# import mujoco_py
 
 
 def concat_state_latent(s, z_, n):
@@ -85,17 +84,17 @@ if __name__ == "__main__":
                 if done:
                     break
 
-            # logger.log(episode,
-            #            episode_reward,
-            #            z,
-            #            sum(logq_zses) / len(logq_zses),
-            #            step,
-            #            np.random.get_state(),
-            #            env.np_random.get_state(),
-            #            env.observation_space.np_random.get_state(),
-            #            env.action_space.np_random.get_state(),
-            #            *agent.get_rng_states(),
-            #            )
+            logger.log(episode,
+                       episode_reward,
+                       z,
+                       sum(logq_zses) / len(logq_zses),
+                       step,
+                       params["seed"],
+                       env.np_random_seed,
+                       env.observation_space.np_random.get_state(),
+                       env.action_space.np_random.get_state(),
+                       *agent.get_rng_states(),
+                       )
 
     else:
         logger.load_weights()
