@@ -8,7 +8,7 @@ from sac import SAC
 from diayn import DIAYN
 from torch.utils.tensorboard import SummaryWriter
 from replay_memory import ReplayMemory, ReplayMemoryZ
-
+from tqdm import tqdm
 parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Without Rewards (DIAYN) Args')
 
 parser.add_argument('--env-name', default="HalfCheetah-v2",
@@ -23,7 +23,7 @@ parser.add_argument('--tau', type=float, default=0.005, metavar='G',
                     help='target smoothing coefficient(τ) (default: 0.005)')
 parser.add_argument('--lr', type=float, default=0.0003, metavar='G',
                     help='learning rate (default: 0.0003)')
-parser.add_argument('--alpha', type=float, default=0.2, metavar='G',
+parser.add_argument('--alpha', type=float, default=0.1, metavar='G',
                     help='Temperature parameter α determines the relative importance of the entropy\
                             term against the reward (default: 0.2)')
 parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, metavar='G',
@@ -76,7 +76,8 @@ updates = 0
 train_rewards = []
 eval_rewards = []
 
-for i_episode in itertools.count(1):
+for i in tqdm(range(args.num_steps)):
+    i_episode = i
     episode_reward = 0
     episode_steps = 0
     done = False
@@ -119,7 +120,7 @@ for i_episode in itertools.count(1):
         break
     train_rewards.append(episode_reward)
     writer.add_scalar('reward/train', episode_reward, i_episode)
-    print("Episode: {}, total numsteps: {}, episode steps: {}, reward: {}".format(i_episode, total_numsteps, episode_steps, round(episode_reward, 2)))
+    #print("Episode: {}, total numsteps: {}, episode steps: {}, reward: {}".format(i_episode, total_numsteps, episode_steps, round(episode_reward, 2)))
 
     if i_episode % 10 == 0 and args.eval is True:
         avg_reward = 0.
@@ -144,9 +145,9 @@ for i_episode in itertools.count(1):
         eval_rewards.append(avg_reward)
         writer.add_scalar('avg_reward/test', avg_reward, i_episode)
 
-        print("----------------------------------------")
-        print("Test Episodes: {}, Avg. Reward: {}".format(episodes, round(avg_reward, 2)))
-        print("----------------------------------------")
+        #print("----------------------------------------")
+        #print("Test Episodes: {}, Avg. Reward: {}".format(episodes, round(avg_reward, 2)))
+        #print("----------------------------------------")
 #test_env.close_video_recorder()
 test_env.close()
 env.close()
