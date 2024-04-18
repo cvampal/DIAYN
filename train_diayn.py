@@ -76,7 +76,7 @@ updates = 0
 train_rewards = []
 eval_rewards = []
 
-for i in tqdm(range(args.num_steps)):
+for i in tqdm(range(args.num_steps//2000)):
     i_episode = i
     episode_reward = 0
     episode_steps = 0
