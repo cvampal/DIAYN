@@ -150,3 +150,23 @@ class DeterministicPolicy(nn.Module):
         self.action_bias = self.action_bias.to(device)
         self.noise = self.noise.to(device)
         return super(DeterministicPolicy, self).to(device)
+
+
+class Discriminator(nn.Module):
+    def __init__(self, n_states, n_skills, n_hidden_filters=256):
+        super(Discriminator, self).__init__()
+        self.n_states = n_states
+        self.n_skills = n_skills
+        self.n_hidden_filters = n_hidden_filters
+
+        self.hidden1 = nn.Linear(in_features=self.n_states, out_features=self.n_hidden_filters)
+        self.hidden2 = nn.Linear(in_features=self.n_hidden_filters, out_features=self.n_hidden_filters)
+        self.q = nn.Linear(in_features=self.n_hidden_filters, out_features=self.n_skills)
+
+        self.apply(weights_init_)
+        
+    def forward(self, states):
+        x = F.relu(self.hidden1(states))
+        x = F.relu(self.hidden2(x))
+        logits = self.q(x)
+        return logits
