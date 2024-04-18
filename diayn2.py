@@ -65,57 +65,80 @@ class DIAYN(object):
         skill_one_hot[skill] = 1.0
         return np.concatenate([state, skill_one_hot])
 
+    def update_critic(self, batch):
+        state_batch, action_batch, next_state_batch, mask_batch = batch
+        states, zs_one_hot = torch.split(next_state_batch, [self.num_inputs, self.num_skill], dim=-1)
+        zs = zs_one_hot.argmax(-1)
+        with torch.no_grad():
+            logits = self.discriminator(states)
+            rewards = -F.cross_entropy(logits, zs, reduction='none')
+            log_p_z = torch.log((self.p_zs * zs_one_hot).sum(-1) + 1e-6)
+            rewards -= log_p_z
+            next_state_action, next_state_log_pi, _ = self.policy.sample(next_state_batch)
+            qf1_next_target, qf2_next_target = self.critic_target(next_state_batch, next_state_action)
+            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self.alpha * next_state_log_pi
+            
+        next_q_value = rewards.view(-1,1) - (1 - mask_batch) * self.gamma * (min_qf_next_target)
+        
+        qf1, qf2 = self.critic(state_batch, action_batch)
+        qf1_loss = F.mse_loss(qf1, next_q_value)
+        qf2_loss = F.mse_loss(qf2, next_q_value)
+        #print(rewards.shape,min_qf_next_target.shape,next_q_value.shape)
+        qf_loss = qf1_loss + qf2_loss
+
+        self.critic_optim.zero_grad()
+        qf_loss.backward()
+        self.critic_optim.step()
+        return qf1_loss.item(), qf2_loss.item()
+
+    def update_actor(self, state_batch):
+        action, log_action, _ = self.policy.sample(state_batch)
+        with torch.no_grad():
+            qf1_pi, qf2_pi = self.critic(state_batch, action)
+            min_qf = torch.min(qf1_pi, qf2_pi)
+
+        policy_loss = ((self.alpha * log_action) - min_qf).mean()
+        self.policy_optim.zero_grad()
+        policy_loss.backward()
+        self.policy_optim.step()
+        return policy_loss.item(), log_action.detach()
+
+
+    def update_discriminator(self, next_state_batch, skill_batch):
+        states, _ = torch.split(next_state_batch, [self.num_inputs, self.num_skill], dim=-1)
+        dis_logits = self.discriminator(states)
+        dis_loss = F.cross_entropy(dis_logits, skill_batch)
+
+        self.dis_optim.zero_grad()
+        dis_loss.backward()
+        self.dis_optim.step()
+        return dis_loss.item()
+
 
     def update_parameters(self, memory, batch_size, updates):
         # Sample a batch from memory
         state_batch, action_batch, reward_batch, next_state_batch, mask_batch, skill_batch = memory.sample(batch_size=batch_size)
 
+        #reward_batch = torch.FloatTensor(reward_batch).to(self.device).unsqueeze(1)
         state_batch = torch.FloatTensor(state_batch).to(self.device)
         next_state_batch = torch.FloatTensor(next_state_batch).to(self.device)
         action_batch = torch.FloatTensor(action_batch).to(self.device)
-        #reward_batch = torch.FloatTensor(reward_batch).to(self.device).unsqueeze(1)
         mask_batch = torch.FloatTensor(mask_batch).to(self.device).unsqueeze(1)
-        skill_batch = torch.LongTensor(skill_batch).to(self.device).view(-1,1)
-        # print(skill_batch.shape)
-        st = torch.split(next_state_batch, [self.num_inputs, self.num_skill], dim=-1)[0]
-        dis_out = self.discriminator(st).log_softmax(-1)
-        with torch.no_grad():
-            next_state_action, next_state_log_pi, _ = self.policy.sample(next_state_batch)
-            qf1_next_target, qf2_next_target = self.critic_target(next_state_batch, next_state_action)
-            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self.alpha * next_state_log_pi
-            psudo_rewards =  dis_out.gather(-1, skill_batch).detach() - torch.log(self.p_zs.gather(-1, skill_batch) + 1e-6)
-            next_q_value = psudo_rewards + mask_batch * self.gamma * (min_qf_next_target)
-        # print(psudo_rewards.mean(0), reward_batch.mean(0))
+        skill_batch = torch.LongTensor(skill_batch).to(self.device)
+
         
-        qf1, qf2 = self.critic(state_batch, action_batch)  # Two Q-functions to mitigate positive bias in the policy improvement step
-        qf1_loss = F.mse_loss(qf1, next_q_value)  # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
-        qf2_loss = F.mse_loss(qf2, next_q_value)  # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
-        qf_loss = qf1_loss + qf2_loss
-        # print(next_q_value.shape, min_qf_next_target.shape, qf1.shape)
-        
-        self.critic_optim.zero_grad()
-        qf_loss.backward()
-        self.critic_optim.step()
+        #update critic network
+        qf1_loss, qf2_loss = self.update_critic((state_batch, action_batch, next_state_batch, mask_batch))
 
-        pi, log_pi, _ = self.policy.sample(state_batch)
+        #update policy network
+        policy_loss, log_pi = self.update_actor(state_batch)
 
-        qf1_pi, qf2_pi = self.critic(state_batch, pi)
-        min_qf_pi = torch.min(qf1_pi, qf2_pi)
+        #update discriminator
+        dis_loss = self.update_discriminator(next_state_batch, skill_batch)
 
-        policy_loss = ((self.alpha * log_pi) - min_qf_pi).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
-
-        self.policy_optim.zero_grad()
-        policy_loss.backward()
-        self.policy_optim.step()
-
-        dis_logits = self.discriminator(st)
-        dis_loss = F.cross_entropy(dis_logits, skill_batch.squeeze())
-        self.dis_optim.zero_grad()
-        dis_loss.backward()
-        self.dis_optim.step()
         #print(dis_loss)
         if self.automatic_entropy_tuning:
-            alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
+            alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy)).mean()
 
             self.alpha_optim.zero_grad()
             alpha_loss.backward()
@@ -131,7 +154,7 @@ class DIAYN(object):
         if updates % self.target_update_interval == 0:
             soft_update(self.critic_target, self.critic, self.tau)
 
-        return qf1_loss.item(), qf2_loss.item(), policy_loss.item(), alpha_loss.item(), alpha_tlogs.item(), dis_loss.item()
+        return qf1_loss, qf2_loss, policy_loss, alpha_loss, alpha_tlogs, dis_loss
 
     # Save model parameters
     def save_checkpoint(self, env_name, suffix="", ckpt_path=None):

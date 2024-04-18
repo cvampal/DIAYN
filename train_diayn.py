@@ -5,7 +5,7 @@ import numpy as np
 import itertools
 import torch
 from sac import SAC
-from diayn import DIAYN
+from diayn2 import DIAYN
 from torch.utils.tensorboard import SummaryWriter
 from replay_memory import ReplayMemory, ReplayMemoryZ
 from tqdm import tqdm
@@ -19,10 +19,10 @@ parser.add_argument('--eval', type=bool, default=True,
                     help='Evaluates a policy a policy every 10 episode (default: True)')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
                     help='discount factor for reward (default: 0.99)')
-parser.add_argument('--tau', type=float, default=0.005, metavar='G',
+parser.add_argument('--tau', type=float, default=0.01, metavar='G',
                     help='target smoothing coefficient(τ) (default: 0.005)')
 parser.add_argument('--lr', type=float, default=0.0003, metavar='G',
-                    help='learning rate (default: 0.0003)')
+                    help='learning rate (default: 0.003)')
 parser.add_argument('--alpha', type=float, default=0.1, metavar='G',
                     help='Temperature parameter α determines the relative importance of the entropy\
                             term against the reward (default: 0.2)')
@@ -30,23 +30,23 @@ parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, meta
                     help='Automaically adjust α (default: False)')
 parser.add_argument('--seed', type=int, default=123456, metavar='N',
                     help='random seed (default: 123456)')
-parser.add_argument('--batch_size', type=int, default=256, metavar='N',
+parser.add_argument('--batch_size', type=int, default=128, metavar='N',
                     help='batch size (default: 256)')
-parser.add_argument('--num_steps', type=int, default=1000001, metavar='N',
-                    help='maximum number of steps (default: 1000000)')
+parser.add_argument('--num_episodes', type=int, default=1000, metavar='N',
+                    help='maximum number of episodes (default: 500)')
 parser.add_argument('--hidden_size', type=int, default=256, metavar='N',
                     help='hidden size (default: 256)')
-parser.add_argument('--updates_per_step', type=int, default=1, metavar='N',
+parser.add_argument('--updates_per_step', type=int, default=5, metavar='N',
                     help='model updates per simulator step (default: 1)')
-parser.add_argument('--start_steps', type=int, default=10000, metavar='N',
+parser.add_argument('--start_steps', type=int, default=3000, metavar='N',
                     help='Steps sampling random actions (default: 10000)')
-parser.add_argument('--target_update_interval', type=int, default=1, metavar='N',
+parser.add_argument('--target_update_interval', type=int, default=10, metavar='N',
                     help='Value target update per no. of updates per step (default: 1)')
 parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
                     help='size of replay buffer (default: 10000000)')
 parser.add_argument('--cuda', action="store_true",
                     help='run on CUDA (default: False)')
-parser.add_argument('--num_skills', type=int, default=8, metavar='N',
+parser.add_argument('--num_skills', type=int, default=50, metavar='N',
                     help='number of skills to learn (default: 8)')
 args = parser.parse_args()
 
@@ -76,7 +76,7 @@ updates = 0
 train_rewards = []
 eval_rewards = []
 
-for i in tqdm(range(args.num_steps//2000)):
+for i in tqdm(range(args.num_episodes)):
     i_episode = i
     episode_reward = 0
     episode_steps = 0
@@ -116,34 +116,28 @@ for i in tqdm(range(args.num_steps//2000)):
         memory.push(state, action, reward, next_state, mask, z) # Append transition to memory
         state = next_state
 
-    if total_numsteps > args.num_steps:
+    if total_numsteps > env._max_episode_steps * args.num_episodes:
         break
     train_rewards.append(episode_reward)
     writer.add_scalar('reward/train', episode_reward, i_episode)
     #print("Episode: {}, total numsteps: {}, episode steps: {}, reward: {}".format(i_episode, total_numsteps, episode_steps, round(episode_reward, 2)))
 
     if i_episode % 10 == 0 and args.eval is True:
-        avg_reward = 0.
-        episodes = 10
-        for _  in range(episodes):
-            state, _ = test_env.reset(seed=args.seed)
-            episode_reward = 0
-            done = False
-            state = agent.concat_ss(state, z)
-            while not done:
-                action = agent.select_action(state, evaluate=True)
+        state, _ = test_env.reset(seed=args.seed)
+        episode_reward = 0
+        done = False
+        state = agent.concat_ss(state, z)
+        while not done:
+            action = agent.select_action(state, evaluate=True)
 
-                next_state, reward, done, done2,  _ = test_env.step(action)
-                done = done or done2
-                episode_reward += reward
-                #test_env.render()
+            next_state, reward, done, done2,  _ = test_env.step(action)
+            done = done or done2
+            episode_reward += reward
+            #test_env.render()
+            state = agent.concat_ss(next_state,z)
 
-
-                state = agent.concat_ss(next_state,z)
-            avg_reward += episode_reward
-        avg_reward /= episodes
-        eval_rewards.append(avg_reward)
-        writer.add_scalar('avg_reward/test', avg_reward, i_episode)
+        eval_rewards.append(episode_reward)
+        writer.add_scalar('avg_reward/test', episode_reward, i_episode)
 
         #print("----------------------------------------")
         #print("Test Episodes: {}, Avg. Reward: {}".format(episodes, round(avg_reward, 2)))
@@ -151,6 +145,6 @@ for i in tqdm(range(args.num_steps//2000)):
 #test_env.close_video_recorder()
 test_env.close()
 env.close()
-
+agent.save_checkpoint(args.env_name)
 torch.save(torch.tensor(train_rewards), f"logs/{args.env_name}_train_reward_{args.seed}.pt")
 torch.save(torch.tensor(eval_rewards), f"logs/{args.env_name}_eval_rewards_{args.seed}.pt")
