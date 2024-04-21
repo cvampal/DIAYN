@@ -1,6 +1,0 @@
-gymnasium
-swig
-gymnasium[box2d]
-gymnasium[mujoco]
-tensorboard
-torch

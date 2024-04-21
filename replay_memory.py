@@ -1,81 +1,32 @@
 import random
-import numpy as np
+from collections import namedtuple
 
-class ReplayMemory:
-    def __init__(self, capacity, seed):
-        random.seed(seed)
-        self.capacity = capacity
+Transition = namedtuple('Transition', ('state', 'z', 'done', 'action', 'next_state'))
+
+
+class Memory:
+    def __init__(self, buffer_size, seed):
+        self.buffer_size = buffer_size
         self.buffer = []
-        self.position = 0
+        self.seed = seed
+        random.seed(self.seed)
 
-    def push(self, state, action, reward, next_state, done):
-        if len(self.buffer) < self.capacity:
-            self.buffer.append(None)
-        self.buffer[self.position] = (state, action, reward, next_state, done)
-        self.position = (self.position + 1) % self.capacity
+    def add(self, *transition):
+        self.buffer.append(Transition(*transition))
+        if len(self.buffer) > self.buffer_size:
+            self.buffer.pop(0)
+        assert len(self.buffer) <= self.buffer_size
 
-    def sample(self, batch_size):
-        batch = random.sample(self.buffer, batch_size)
-        state, action, reward, next_state, done = map(np.stack, zip(*batch))
-        return state, action, reward, next_state, done
+    def sample(self, size):
+        return random.sample(self.buffer, size)
 
     def __len__(self):
         return len(self.buffer)
 
-    def save_buffer(self, env_name, suffix="", save_path=None):
-        if not os.path.exists('checkpoints/'):
-            os.makedirs('checkpoints/')
+    @staticmethod
+    def get_rng_state():
+        return random.getstate()
 
-        if save_path is None:
-            save_path = "checkpoints/sac_buffer_{}_{}".format(env_name, suffix)
-        print('Saving buffer to {}'.format(save_path))
-
-        with open(save_path, 'wb') as f:
-            pickle.dump(self.buffer, f)
-
-    def load_buffer(self, save_path):
-        print('Loading buffer from {}'.format(save_path))
-
-        with open(save_path, "rb") as f:
-            self.buffer = pickle.load(f)
-            self.position = len(self.buffer) % self.capacity
-
-
-class ReplayMemoryZ:
-    def __init__(self, capacity, seed):
-        random.seed(seed)
-        self.capacity = capacity
-        self.buffer = []
-        self.position = 0
-
-    def push(self, state, action, reward, next_state, done, z):
-        if len(self.buffer) < self.capacity:
-            self.buffer.append(None)
-        self.buffer[self.position] = (state, action, reward, next_state, done, z)
-        self.position = (self.position + 1) % self.capacity
-
-    def sample(self, batch_size):
-        batch = random.sample(self.buffer, batch_size)
-        state, action, reward, next_state, done, z = map(np.stack, zip(*batch))
-        return state, action, reward, next_state, done, z
-
-    def __len__(self):
-        return len(self.buffer)
-
-    def save_buffer(self, env_name, suffix="", save_path=None):
-        if not os.path.exists('checkpoints/'):
-            os.makedirs('checkpoints/')
-
-        if save_path is None:
-            save_path = "checkpoints/sac_buffer_{}_{}".format(env_name, suffix)
-        print('Saving buffer to {}'.format(save_path))
-
-        with open(save_path, 'wb') as f:
-            pickle.dump(self.buffer, f)
-
-    def load_buffer(self, save_path):
-        print('Loading buffer from {}'.format(save_path))
-
-        with open(save_path, "rb") as f:
-            self.buffer = pickle.load(f)
-            self.position = len(self.buffer) % self.capacity
+    @staticmethod
+    def set_rng_state(random_rng_state):
+        random.setstate(random_rng_state)
